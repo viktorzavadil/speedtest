@@ -13,12 +13,15 @@ type Test struct {
 	cfg    *config.Config
 	target *Target
 
+	status atomic.Uint32
+
 	lastLatency   atomic.Int64
 	latencySum    atomic.Int64
 	pingSuccesses atomic.Int64
 	pingErrors    atomic.Int64
 	latencyMu     sync.Mutex
-	latencies     []time.Duration
+	minLatency    time.Duration
+	maxLatency    time.Duration
 
 	targetCpuUsage    atomic.Uint64
 	targetAllocMemory atomic.Uint64
@@ -30,20 +33,34 @@ type Test struct {
 }
 
 func NewTest(cfg *config.Config, target *Target) *Test {
-	return &Test{cfg: cfg, target: target}
+	test := &Test{cfg: cfg, target: target}
+	test.status.Store(uint32(Initialization))
+	return test
 }
 
 func (t *Test) Run(ctx context.Context, wg *sync.WaitGroup) {
+	probeContext, probeCancel := context.WithCancel(ctx)
+
 	wg.Add(1)
-	go t.runLatencyProbe(ctx, wg)
+	go t.runLatencyProbe(probeContext, wg)
 	wg.Add(1)
-	go t.runTargetMetricsProbe(ctx, wg)
+	go t.runTargetMetricsProbe(probeContext, wg)
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		defer probeCancel()
+
+		t.status.Store(uint32(DownloadPhase))
 		t.runTestPhase(ctx, t.testDownload, t.cfg.DownloadPhaseDuration)
+		t.status.Store(uint32(UploadPhase))
 		t.runTestPhase(ctx, t.testUpload, t.cfg.UploadPhaseDuration)
+
+		if ctx.Err() == nil {
+			t.status.Store(uint32(Finished))
+		} else {
+			t.status.Store(uint32(Interrupted))
+		}
 	}()
 }
 
@@ -61,12 +78,17 @@ func (t *Test) GetStatistics() Statistics {
 		avgLatency = time.Duration(latencySum/pingSuccesses) * time.Microsecond
 	}
 	return Statistics{
+		TestStatus: TestStatus(t.status.Load()),
+
 		LastLatency:   time.Duration(t.lastLatency.Load()) * time.Microsecond,
 		AvgLatency:    avgLatency,
 		PingSuccesses: pingSuccesses,
 		PingErrors:    pingErrors,
 		PingTotal:     pingTotal,
 		PingLost:      pingLost,
+
+		MinLatency: t.minLatency,
+		MaxLatency: t.maxLatency,
 
 		TargetCpuUsage:    math.Float64frombits(t.targetCpuUsage.Load()) * 100,
 		TargetAllocMemory: math.Float64frombits(t.targetAllocMemory.Load()),

@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"speedtest/client/internal/config"
 	"speedtest/client/internal/service"
+	"speedtest/client/internal/utils"
 	"sync"
 	"syscall"
 	"time"
@@ -16,7 +17,10 @@ import (
 //go:embed banner.txt
 var banner string
 
-const MB = 1024 * 1024
+const (
+	MB    = 1024 * 1024
+	lines = 13
+)
 
 func main() {
 	cfg := config.Load()
@@ -51,6 +55,8 @@ func main() {
 	go runStatistics(ctx, &wg, cfg, test)
 
 	wg.Wait()
+
+	printFinalResult(cfg, test)
 }
 
 func runStatistics(ctx context.Context, wg *sync.WaitGroup, cfg *config.Config, test *service.Test) {
@@ -69,7 +75,6 @@ func runStatistics(ctx context.Context, wg *sync.WaitGroup, cfg *config.Config, 
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Println()
 			return
 		case <-ticker.C:
 			stats := test.GetStatistics()
@@ -77,29 +82,58 @@ func runStatistics(ctx context.Context, wg *sync.WaitGroup, cfg *config.Config, 
 			now := time.Now()
 			rx := stats.RxCount
 			tx := stats.TxCount
-			rxRate := toMbit(float64(rx-prevRx)) / now.Sub(prevTime).Seconds()
-			txRate := toMbit(float64(tx-prevTx)) / now.Sub(prevTime).Seconds()
+			rxRate := utils.FormatBitrate(rx-prevRx, now.Sub(prevTime))
+			txRate := utils.FormatBitrate(tx-prevTx, now.Sub(prevTime))
 			prevRx, prevTx, prevTime = rx, tx, now
 
 			if !firstRun {
-				fmt.Printf("\033[%dA", 11)
+				fmt.Printf("\033[%dA", lines)
 			}
 			firstRun = false
-			fmt.Printf("\r\033[2K      last latency: %s\n", stats.LastLatency)
-			fmt.Printf("\r\033[2K       avg latency: %s\n", stats.AvgLatency)
-			fmt.Printf("\r\033[2K         ping lost: %.1f%%\n", stats.PingLost)
-			fmt.Printf("\r\033[2K          rx bytes: %.1fMB\n", float64(stats.RxCount)/MB)
-			fmt.Printf("\r\033[2K           rx rate: %.1fMbit/s\n", rxRate)
-			fmt.Printf("\r\033[2K         rx errors: %d\n", stats.RxErrors)
-			fmt.Printf("\r\033[2K          tx bytes: %.1fMB\n", float64(stats.TxCount)/MB)
-			fmt.Printf("\r\033[2K           tx rate: %.1fMbit/s\n", txRate)
-			fmt.Printf("\r\033[2K         tx errors: %d\n", stats.TxErrors)
-			fmt.Printf("\r\033[2K  target cpu usage: %.1f%%\n", stats.TargetCpuUsage)
-			fmt.Printf("\r\033[2K  target mem usage: %.1fMB\n", stats.TargetAllocMemory)
+
+			fmt.Printf("\r\033[2K\033[1m%18s:\033[0m %s\n\n", "status", toStrStatus(stats.TestStatus))
+
+			fmt.Printf("\r\033[2K%18s: %s\n", "last latency", utils.FormatDuration(stats.LastLatency))
+			fmt.Printf("\r\033[2K%18s: %s\n", "avg latency", utils.FormatDuration(stats.AvgLatency))
+			fmt.Printf("\r\033[2K%18s: %.1f%%\n", "ping lost", stats.PingLost)
+			fmt.Printf("\r\033[2K%18s: %s\n", "rx bytes", utils.FormatBytes(stats.RxCount))
+			fmt.Printf("\r\033[2K%18s: %s\n", "rx bitrate", rxRate)
+			fmt.Printf("\r\033[2K%18s: %d\n", "rx errors", stats.RxErrors)
+			fmt.Printf("\r\033[2K%18s: %s\n", "tx bytes", utils.FormatBytes(stats.TxCount))
+			fmt.Printf("\r\033[2K%18s: %s\n", "tx bitrate", txRate)
+			fmt.Printf("\r\033[2K%18s: %d\n", "tx errors", stats.TxErrors)
+			fmt.Printf("\r\033[2K%18s: %.1f%%\n", "target cpu usage", stats.TargetCpuUsage)
+			fmt.Printf("\r\033[2K%18s: %.1fMB\n", "target mem usage", stats.TargetAllocMemory)
 		}
 	}
 }
 
-func toMbit(bytes float64) float64 {
-	return bytes * 8 / 1e6
+func printFinalResult(cfg *config.Config, test *service.Test) {
+	stats := test.GetStatistics()
+
+	fmt.Printf("\033[%dA\033[J", lines)
+
+	fmt.Printf("\r\033[1m%18s:\033[0m %s\n\n", "status", toStrStatus(stats.TestStatus))
+
+	fmt.Printf("%18s: min=%-10s avg=%-10s max=%s\n", "latency", utils.FormatDuration(stats.MinLatency), utils.FormatDuration(stats.AvgLatency), utils.FormatDuration(stats.MaxLatency))
+	fmt.Printf("%18s: %.1f%%\n", "ping lost", stats.PingLost)
+	fmt.Printf("%18s: %-10s %s\n", "rx", utils.FormatBytes(stats.RxCount), utils.FormatBitrate(stats.RxCount, cfg.DownloadPhaseDuration))
+	fmt.Printf("%18s: %-10s %s\n", "tx", utils.FormatBytes(stats.TxCount), utils.FormatBitrate(stats.TxCount, cfg.UploadPhaseDuration))
+}
+
+func toStrStatus(status service.TestStatus) string {
+	switch {
+	case status == service.Initialization:
+		return "initialization"
+	case status == service.DownloadPhase:
+		return "download phase"
+	case status == service.UploadPhase:
+		return "upload phase"
+	case status == service.Finished:
+		return "finished"
+	case status == service.Interrupted:
+		return "interrupted"
+	default:
+		return "unknown"
+	}
 }

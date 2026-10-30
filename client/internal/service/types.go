@@ -2,13 +2,28 @@ package service
 
 import "time"
 
+type TestStatus uint32
+
+const (
+	Initialization TestStatus = iota
+	DownloadPhase  TestStatus = iota
+	UploadPhase    TestStatus = iota
+	Finished       TestStatus = iota
+	Interrupted    TestStatus = iota
+)
+
 type Statistics struct {
+	TestStatus TestStatus
+
 	LastLatency   time.Duration
 	AvgLatency    time.Duration
 	PingTotal     int64
 	PingSuccesses int64
 	PingErrors    int64
 	PingLost      float64
+
+	MinLatency time.Duration
+	MaxLatency time.Duration
 
 	TargetCpuUsage    float64
 	TargetAllocMemory float64

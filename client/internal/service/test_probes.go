@@ -30,7 +30,12 @@ func (t *Test) runLatencyProbe(ctx context.Context, wg *sync.WaitGroup) {
 			t.lastLatency.Store(latency.Microseconds())
 			t.latencySum.Add(latency.Microseconds())
 			t.latencyMu.Lock()
-			t.latencies = append(t.latencies, latency)
+			if t.minLatency == 0 || latency < t.minLatency {
+				t.minLatency = latency
+			}
+			if latency > t.maxLatency {
+				t.maxLatency = latency
+			}
 			t.latencyMu.Unlock()
 		}
 	}
