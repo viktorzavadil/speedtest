@@ -25,7 +25,13 @@ func FormatBytes(b int64) string {
 }
 
 func FormatBitrate(bytes int64, d time.Duration) string {
-	bps := float64(bytes) * 8 / d.Seconds()
+	var bps float64
+	if d > 0 {
+		bps = float64(bytes) * 8 / d.Seconds()
+	} else {
+		bps = 0
+	}
+
 	switch {
 	case bps >= 1e12:
 		return fmt.Sprintf("%.1fTbit/s", bps/1e12)

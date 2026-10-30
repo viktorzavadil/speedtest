@@ -6,24 +6,29 @@ type TestStatus uint32
 
 const (
 	Initialization TestStatus = iota
+	IdlePhase      TestStatus = iota
 	DownloadPhase  TestStatus = iota
 	UploadPhase    TestStatus = iota
 	Finished       TestStatus = iota
 	Interrupted    TestStatus = iota
 )
 
-type Statistics struct {
-	TestStatus TestStatus
-
+type LatencyStatistics struct {
 	LastLatency   time.Duration
 	AvgLatency    time.Duration
+	MinLatency    time.Duration
+	MaxLatency    time.Duration
 	PingTotal     int64
 	PingSuccesses int64
 	PingErrors    int64
 	PingLost      float64
+}
 
-	MinLatency time.Duration
-	MaxLatency time.Duration
+type Statistics struct {
+	TestStatus TestStatus
+
+	IdleLatency   LatencyStatistics
+	LoadedLatency LatencyStatistics
 
 	TargetCpuUsage    float64
 	TargetAllocMemory float64

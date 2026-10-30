@@ -17,26 +17,33 @@ func (t *Test) runLatencyProbe(ctx context.Context, wg *sync.WaitGroup) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			status := TestStatus(t.status.Load())
+			var latency *Latency
+			if IsLoadedStatus(status) {
+				latency = t.loadedLatency
+			} else {
+				latency = t.idleLatency
+			}
 			start := time.Now()
 			err := t.target.Ping(ctx)
 			if err != nil {
 				if ctx.Err() == nil {
-					t.pingErrors.Add(1)
+					latency.pingErrors.Add(1)
 				}
 				continue
 			}
-			t.pingSuccesses.Add(1)
-			latency := time.Since(start)
-			t.lastLatency.Store(latency.Microseconds())
-			t.latencySum.Add(latency.Microseconds())
-			t.latencyMu.Lock()
-			if t.minLatency == 0 || latency < t.minLatency {
-				t.minLatency = latency
+			latency.pingSuccesses.Add(1)
+			latencyDur := time.Since(start)
+			latency.lastLatency.Store(latencyDur.Microseconds())
+			latency.latencySum.Add(latencyDur.Microseconds())
+			latency.latencyMu.Lock()
+			if latency.minLatency == 0 || latencyDur < latency.minLatency {
+				latency.minLatency = latencyDur
 			}
-			if latency > t.maxLatency {
-				t.maxLatency = latency
+			if latencyDur > latency.maxLatency {
+				latency.maxLatency = latencyDur
 			}
-			t.latencyMu.Unlock()
+			latency.latencyMu.Unlock()
 		}
 	}
 }

@@ -5,6 +5,30 @@ Speed Test diagnoses network communication. It measures latency, throughput and 
 The project has two independent parts. The `target` service exposes a REST API that creates network load.
 The `client` application runs load tests and collects diagnostic data.
 
+**Result example:**
+
+```text
+   ____                      _   _____         _
+  / ___| _ __   ___  ___  __| | |_   _|__  ___| |_
+  \___ \| '_ \ / _ \/ _ \/ _' |   | |/ _ \/ __| __|
+   ___) | |_) |  __/  __/ (_| |   | |  __/\__ \ |_
+  |____/| .__/ \___|\___|\__,_|   |_|\___||___/\__|
+        |_|
+
+              target: http://target:8080
+             streams: 10
+ idle phase duration: 5s
+   rx phase duration: 15s
+   tx phase duration: 15s
+
+              status: finished
+
+        idle latency: min=0.480ms    avg=1.165ms    max=1.582ms
+      loaded latency: min=0.248ms    avg=2.216ms    max=9.489ms
+                  rx: 185.2GB    98.8Gbit/s
+                  tx: 128.4GB    68.5Gbit/s
+```
+
 ## Architecture
 
 ```mermaid
@@ -42,6 +66,7 @@ The `client` is a CLI application. It runs diagnostic tests against the `target`
 
 Parameters:
 
+- `idle-phase-duration` - how long the idle phase runs, in seconds
 - `download-phase-duration` - how long the download phase runs, in seconds
 - `upload-phase-duration` - how long the upload phase runs, in seconds
 - `streams` - number of parallel goroutines in the download phase and in the upload phase
@@ -56,8 +81,9 @@ The client runs once in a Docker container and prints results to standard output
 - it starts collecting statistics from the tests and probes and prints them to standard output using ANSI escape codes
 - a goroutine measures latency
     - it sends a `ping` request to `target` every 500 ms
-    - it keeps all measured values, not only the last one, and computes statistics from them
+    - it computes min, avg and max; latency is tracked separately for the idle and loaded phases
 - a goroutine reads metrics from `target` every 1000 ms, such as CPU and memory usage
+- the client first runs an idle phase (`idle-phase-duration`) and measures idle latency
 - a goroutine runs the load test
     - the test has two phases: download and upload
     - download: `streams` goroutines download data in parallel for `download-phase-duration`; the client waits until
@@ -117,17 +143,18 @@ Run the client with default settings:
 make run-client
 ```
 
-| Make variable             | Client flag                | Default                |
-|---------------------------|----------------------------|------------------------|
-| `DOWNLOAD_PHASE_DURATION` | `download-phase-duration`  | `10` (seconds)         |
-| `UPLOAD_PHASE_DURATION`   | `upload-phase-duration`    | `10` (seconds)         |
-| `STREAMS`                 | `streams`                  | `10`                   |
-| `TARGET`                  | `target`                   | `http://target:8080`   |
+| Make variable             | Client flag               | Default              |
+|---------------------------|---------------------------|----------------------|
+| `IDLE_PHASE_DURATION`     | `idle-phase-duration`     | `5`  (seconds)       |
+| `DOWNLOAD_PHASE_DURATION` | `download-phase-duration` | `10` (seconds)       |
+| `UPLOAD_PHASE_DURATION`   | `upload-phase-duration`   | `10` (seconds)       |
+| `STREAMS`                 | `streams`                 | `10`                 |
+| `TARGET`                  | `target`                  | `http://target:8080` |
 
 Run the client with custom settings:
 
 ```bash
-make run-client DOWNLOAD_PHASE_DURATION=5 UPLOAD_PHASE_DURATION=5 STREAMS=3
+make run-client IDLE_PHASE_DURATION=0 DOWNLOAD_PHASE_DURATION=5 UPLOAD_PHASE_DURATION=5 STREAMS=3
 ```
 
 Both services share the API key from the `API_KEY` environment variable (default `sp33dt3st`):
@@ -146,7 +173,6 @@ make down
 ## Todo & Improvements
 
 1. make decision: which endpoints need auth
-1. compute min, max latency
 1. implement CPU usage on client side
 1. compute avg, min, max CPU usage
 1. upload & download in same time (test full duplex)
