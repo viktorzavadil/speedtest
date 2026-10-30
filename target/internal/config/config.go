@@ -4,11 +4,14 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"time"
 )
 
 type Config struct {
 	Port   uint16
 	ApiKey string
+
+	ReadCpuInterval time.Duration
 }
 
 func Load() (config *Config) {
@@ -30,6 +33,8 @@ func Load() (config *Config) {
 		log.Fatal("API_KEY must be set")
 	}
 	config.ApiKey = apiKey
+
+	config.ReadCpuInterval = time.Duration(500) * time.Millisecond
 
 	return config
 }

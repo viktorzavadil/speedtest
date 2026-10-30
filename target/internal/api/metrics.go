@@ -5,18 +5,16 @@ import (
 	"runtime"
 )
 
-func metrics(w http.ResponseWriter, r *http.Request) {
+func (s *Server) getMetrics(w http.ResponseWriter, r *http.Request) {
 	var mem runtime.MemStats
 	runtime.ReadMemStats(&mem)
 
+	metrics := s.metrics.GetMetrics()
+
 	resp := map[string]any{
-		// todo
-		//"cpu": map[string]float64{
-		//	"current_pct": cpuCurrent,
-		//	"avg_pct":     cpuAvg,
-		//	"min_pct":     cpuMin,
-		//	"max_pct":     cpuMax,
-		//},
+		"cpu": map[string]float64{
+			"usage": metrics.CpuUsage,
+		},
 		"memory": map[string]any{
 			"allocMB":    float64(mem.Alloc) / 1024 / 1024,
 			"goroutines": runtime.NumGoroutine(),

@@ -13,8 +13,9 @@ type Config struct {
 	Duration  time.Duration
 	Streams   uint
 
-	StatisticsInterval   time.Duration
-	LatencyProbeInterval time.Duration
+	StatisticsInterval         time.Duration
+	LatencyProbeInterval       time.Duration
+	TargetMetricsProbeInterval time.Duration
 }
 
 func Load() (config *Config) {
@@ -34,6 +35,7 @@ func Load() (config *Config) {
 
 	config.StatisticsInterval = time.Duration(1) * time.Second
 	config.LatencyProbeInterval = time.Duration(500) * time.Millisecond
+	config.TargetMetricsProbeInterval = time.Duration(1000) * time.Millisecond
 
 	return config
 }

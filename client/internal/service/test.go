@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"math"
 	"speedtest/client/internal/config"
 	"sync"
 	"sync/atomic"
@@ -18,6 +19,9 @@ type Test struct {
 	pingErrors    atomic.Int64
 	latencyMu     sync.Mutex
 	latencies     []time.Duration
+
+	targetCpuUsage    atomic.Uint64
+	targetAllocMemory atomic.Uint64
 }
 
 type Statistics struct {
@@ -27,6 +31,9 @@ type Statistics struct {
 	PingSuccesses int64
 	PingErrors    int64
 	PingLost      float64
+
+	TargetCpuUsage    float64
+	TargetAllocMemory float64
 }
 
 func NewTest(cfg *config.Config, target *Target) *Test {
@@ -36,6 +43,8 @@ func NewTest(cfg *config.Config, target *Target) *Test {
 func (t *Test) Run(ctx context.Context, wg *sync.WaitGroup) {
 	wg.Add(1)
 	go t.runLatencyProbe(ctx, wg)
+	wg.Add(1)
+	go t.runTargetMetricsProbe(ctx, wg)
 }
 
 func (t *Test) GetStatistics() Statistics {
@@ -58,6 +67,9 @@ func (t *Test) GetStatistics() Statistics {
 		PingErrors:    pingErrors,
 		PingTotal:     pingTotal,
 		PingLost:      pingLost,
+
+		TargetCpuUsage:    math.Float64frombits(t.targetCpuUsage.Load()) * 100,
+		TargetAllocMemory: math.Float64frombits(t.targetAllocMemory.Load()),
 	}
 }
 
@@ -86,6 +98,27 @@ func (t *Test) runLatencyProbe(ctx context.Context, wg *sync.WaitGroup) {
 			t.latencyMu.Lock()
 			t.latencies = append(t.latencies, latency)
 			t.latencyMu.Unlock()
+		}
+	}
+}
+
+func (t *Test) runTargetMetricsProbe(ctx context.Context, wg *sync.WaitGroup) {
+	defer wg.Done()
+	ticker := time.NewTicker(t.cfg.TargetMetricsProbeInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			response, err := t.target.Metrics(ctx)
+			if err != nil {
+				continue
+			}
+			t.targetCpuUsage.Store(math.Float64bits(response.CPU.Usage))
+			t.targetCpuUsage.Store(math.Float64bits(response.CPU.Usage))
+			t.targetAllocMemory.Store(math.Float64bits(response.Memory.AllocMB))
 		}
 	}
 }

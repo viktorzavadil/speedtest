@@ -21,9 +21,9 @@ func main() {
 
 	fmt.Print("\033[34m\033[1m", banner, "\033[0m\n")
 
-	fmt.Printf("\033[1m        target:\033[0m %s\n", cfg.TargetUrl)
-	fmt.Printf("\033[1m       streams:\033[0m %d parallel streams\n", cfg.Streams)
-	fmt.Printf("\033[1m      duration:\033[0m %s per phase\n\n", cfg.Duration.String())
+	fmt.Printf("\033[1m           target:\033[0m %s\n", cfg.TargetUrl)
+	fmt.Printf("\033[1m          streams:\033[0m %d parallel streams\n", cfg.Streams)
+	fmt.Printf("\033[1m         duration:\033[0m %s per phase\n\n", cfg.Duration.String())
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -64,12 +64,14 @@ func runStatistics(ctx context.Context, wg *sync.WaitGroup, cfg *config.Config, 
 		case <-ticker.C:
 			stats := test.GetStatistics()
 			if !firstRun {
-				fmt.Printf("\033[%dA", 3)
+				fmt.Printf("\033[%dA", 5)
 			}
 			firstRun = false
-			fmt.Printf("\r\033[2K  last latency: %s\n", stats.LastLatency)
-			fmt.Printf("\r\033[2K   avg latency: %s\n", stats.AvgLatency)
-			fmt.Printf("\r\033[2K     ping lost: %.1f%%\n", stats.PingLost)
+			fmt.Printf("\r\033[2K     last latency: %s\n", stats.LastLatency)
+			fmt.Printf("\r\033[2K      avg latency: %s\n", stats.AvgLatency)
+			fmt.Printf("\r\033[2K        ping lost: %.1f%%\n", stats.PingLost)
+			fmt.Printf("\r\033[2K target cpu usage: %.1f%%\n", stats.TargetCpuUsage)
+			fmt.Printf("\r\033[2K target mem usage: %.1fMB\n", stats.TargetAllocMemory)
 		}
 	}
 }
