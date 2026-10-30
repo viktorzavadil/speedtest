@@ -65,7 +65,7 @@ make run-client
 
 Runs test with customized settings:
 ```bash
-make run-client DURATION=1 STREAMS=3
+make run-client DOWNLOAD_PHASE_DURATION=5 UPLOAD_PHASE_DURATION=5 STREAMS=3
 ```
 
 ## Todo & Improvements
@@ -73,3 +73,5 @@ make run-client DURATION=1 STREAMS=3
 1. compute min, max lattency
 1. implement CPU usage on client side
 1. compute avg, min, max CPU usage
+1. upload & download in same time (test full duplex)
+2. upload & download has own configurable timeout

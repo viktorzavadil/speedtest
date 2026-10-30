@@ -22,18 +22,11 @@ type Test struct {
 
 	targetCpuUsage    atomic.Uint64
 	targetAllocMemory atomic.Uint64
-}
 
-type Statistics struct {
-	LastLatency   time.Duration
-	AvgLatency    time.Duration
-	PingTotal     int64
-	PingSuccesses int64
-	PingErrors    int64
-	PingLost      float64
-
-	TargetCpuUsage    float64
-	TargetAllocMemory float64
+	rxCount  atomic.Int64
+	rxErrors atomic.Int64
+	txCount  atomic.Int64
+	txErrors atomic.Int64
 }
 
 func NewTest(cfg *config.Config, target *Target) *Test {
@@ -45,6 +38,13 @@ func (t *Test) Run(ctx context.Context, wg *sync.WaitGroup) {
 	go t.runLatencyProbe(ctx, wg)
 	wg.Add(1)
 	go t.runTargetMetricsProbe(ctx, wg)
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		t.runTestPhase(ctx, t.testDownload, t.cfg.DownloadPhaseDuration)
+		t.runTestPhase(ctx, t.testUpload, t.cfg.UploadPhaseDuration)
+	}()
 }
 
 func (t *Test) GetStatistics() Statistics {
@@ -70,55 +70,26 @@ func (t *Test) GetStatistics() Statistics {
 
 		TargetCpuUsage:    math.Float64frombits(t.targetCpuUsage.Load()) * 100,
 		TargetAllocMemory: math.Float64frombits(t.targetAllocMemory.Load()),
+
+		RxCount:  t.rxCount.Load(),
+		RxErrors: t.rxErrors.Load(),
+		TxCount:  t.txCount.Load(),
+		TxErrors: t.txErrors.Load(),
 	}
 }
 
-func (t *Test) runLatencyProbe(ctx context.Context, wg *sync.WaitGroup) {
-	defer wg.Done()
-	ticker := time.NewTicker(t.cfg.LatencyProbeInterval)
-	defer ticker.Stop()
+func (t *Test) runTestPhase(ctx context.Context, phase func(ctx context.Context), duration time.Duration) {
+	ctx, cancel := context.WithTimeout(ctx, duration)
+	defer cancel()
 
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			start := time.Now()
-			err := t.target.Ping(ctx)
-			if err != nil {
-				if ctx.Err() == nil {
-					t.pingErrors.Add(1)
-				}
-				continue
-			}
-			t.pingSuccesses.Add(1)
-			latency := time.Since(start)
-			t.lastLatency.Store(latency.Microseconds())
-			t.latencySum.Add(latency.Microseconds())
-			t.latencyMu.Lock()
-			t.latencies = append(t.latencies, latency)
-			t.latencyMu.Unlock()
-		}
+	var phaseWg sync.WaitGroup
+
+	for i := 0; i < int(t.cfg.Streams); i++ {
+		phaseWg.Add(1)
+		go func() {
+			defer phaseWg.Done()
+			phase(ctx)
+		}()
 	}
-}
-
-func (t *Test) runTargetMetricsProbe(ctx context.Context, wg *sync.WaitGroup) {
-	defer wg.Done()
-	ticker := time.NewTicker(t.cfg.TargetMetricsProbeInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			response, err := t.target.Metrics(ctx)
-			if err != nil {
-				continue
-			}
-			t.targetCpuUsage.Store(math.Float64bits(response.CPU.Usage))
-			t.targetCpuUsage.Store(math.Float64bits(response.CPU.Usage))
-			t.targetAllocMemory.Store(math.Float64bits(response.Memory.AllocMB))
-		}
-	}
+	phaseWg.Wait()
 }
