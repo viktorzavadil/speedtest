@@ -1,10 +1,9 @@
 # Speed Test
 
-Speed Test tools diagnostikují síťovou komunikaci. Měří latency, propustnost a další diagnostické informace síťové
-komunikace.
+Speed Test diagnoses network communication. It measures latency, throughput and other diagnostic data.
 
-Projekt se skládá ze dvou nezávislých služeb. Služba `target` vystavuje REST API pro vytvoření zátěže na síti.
-Aplikace `client` spouští zátěžové testy a shromažduje diagnostická data.
+The project has two independent parts. The `target` service exposes a REST API that creates network load.
+The `client` application runs load tests and collects diagnostic data.
 
 ## Architecture
 
@@ -20,70 +19,54 @@ graph TD
 
 ### Target service
 
-Služba `target` vystavuje REST API endpointy pro vytvoření zátěže na síti a endpointy pro diagnostiku. Všechny endpointy
-jsou za autentizačním middleware, který kontroluje hlavičku `X-Api-Key` oproti nakonfigurovanému klíči přes
-environmentální proměnnou `API_KEY`. Porovnání klíčů bylo kvůli co největší efektivitě při zachování bezpečnosti
-realizováno pomocí funkce `subtle.ConstantTimeCompare`, u které nelze na základě času odvodit správnost klíče.
+The `target` service exposes REST API endpoints for creating network load and for diagnostics. All endpoints are behind
+an authentication middleware. It checks the `X-Api-Key` header against the key set in the `API_KEY` environment
+variable. The keys are compared with `subtle.ConstantTimeCompare`, so the response time does not reveal whether the key
+is correct.
 
-V aplikaci je inicializována goroutine, která sbírá aktuální metriky procesoru a paměti, které lze na vyžádání
-poskytnout přes REST API.
+A goroutine collects current CPU and memory metrics. The metrics are available through the REST API.
 
-Služba běží v docker containeru.
+The service runs in a Docker container.
 
 **API**:
 
-- `GET /ping` - implementován jako jednoduchý handler vracející 204 (no content).
-- `GET /metrics` - poskytuje informace o stavu procesoru a paměti ve formátu JSON
-  ```json
-    {
-      "cpu": {
-        "usage": 0.07940446650124067
-      },
-      "memory": {
-        "allocMB": 2.0848236083984375,
-        "goroutines": 9
-      }
-    }
-  ```
-- `GET /download` - poskytuje nekonečný stream dat
-- `POST /upload` - konzumuje stream dat a zahazuje je (discard); po přijetí všech dat odpovídá o velikosti přijatých dat
-  ```json
-    {
-      "receivedBytes": 524
-    }
-  ```
+- `GET /ping` - simple handler that returns 204 (no content).
+- `GET /metrics` - returns CPU and memory metrics as JSON.
+- `GET /download` - returns an infinite stream of data.
+- `POST /upload` - reads the data stream and discards it. When all data is received, it returns the number of received
+  bytes.
 
 ### Client application
 
-CLI aplikace `client` inicializuje diagnostické testy proti službě `target`.
+The `client` is a CLI application. It runs diagnostic tests against the `target` service.
 
-Aplikaci lze parametrizovat následujícími vlastnostmi při spuštění:
+Parameters:
 
-- `download-phase-duration` - doba v sekundách, kdy se provádí stahování dat ze služby `target`
-- `upload-phase-duration`  - doba v sekundách, kdy se provádí nahrávání dat do služby `target`
-- `streams` - počet paralelních goroutines provádející fázi stahování a následně fázi nahrávání
-- `target` - URL cílové služby
+- `download-phase-duration` - how long the download phase runs, in seconds
+- `upload-phase-duration` - how long the upload phase runs, in seconds
+- `streams` - number of parallel goroutines in the download phase and in the upload phase
+- `target` - URL of the `target` service
 
-Služba běží jednorázově v docker containeru a výsledky vypisuje na standardní výstup.
+The client runs once in a Docker container and prints results to standard output.
 
-**Popis chování:**
+**How it works:**
 
-- po spuštění jednorázového docker kontejneru se inicializuje aplikace
-- proběhne `ping` request na službu `target`, pokud neprojde, aplikace se zastaví
-- aplikace inicializuje sběr statistik z testů a sond a vypisuje je na standardní výstup pomocí ANSI esc znaků
-- spustí se goroutine na měření latence
-    - aplikace posílá každých 500ms `ping` request proti službe `target`
-    - nabírá kromě poslední hodnoty i průběžné měření, z kterých se počítají statistiky
-- spustí se goroutine na vyčítání metrik ze služby `target`, jako je využití CPU, paměti a podobně
-- spustí se goroutine na samotný zátěžový test
-    - test se skládá ze dvou fází; fáze stahování dat a fáze odesílání dat
-    - podle nastaveného parametru `streams` se inicializuje `n` goroutines pro stahování dat, které běží paralelně; doba
-      testu je nastavená parametrem `download-phase-duration`; čeká se na doběhnutí testu
-    - podle nastaveného parametru `streams` se inicializuje `n` goroutines pro nahrávání dat, které běží paralelně; doba
-      testu je nastavená parametrem `upload-phase-duration`; čeká se na doběhnutí testu
-    - během obou testů se sbírá kolik bylo odesláno a přijato dat
+- the client starts in a one-off Docker container
+- it sends a `ping` request to `target`; if it fails, the client stops
+- it starts collecting statistics from the tests and probes and prints them to standard output using ANSI escape codes
+- a goroutine measures latency
+    - it sends a `ping` request to `target` every 500 ms
+    - it keeps all measured values, not only the last one, and computes statistics from them
+- a goroutine reads metrics from `target` every 1000 ms, such as CPU and memory usage
+- a goroutine runs the load test
+    - the test has two phases: download and upload
+    - download: `streams` goroutines download data in parallel for `download-phase-duration`; the client waits until
+      the phase ends
+    - upload: `streams` goroutines upload data in parallel for `upload-phase-duration`; the client waits until the
+      phase ends
+    - in both phases the client counts sent and received data
 
-**Sekvenční diagram diagnostických testů:**
+**Sequence diagram:**
 
 ```mermaid
 ---
@@ -91,15 +74,15 @@ config:
   theme: neutral
 ---
 sequenceDiagram
-    participant C as Speed Test Client
+    participant C as Client Application
     participant T as Target Service
-    Note over C, T: reads ping latency in separated goroutine
+    Note over C, T: latency is measured in a separate goroutine
     loop latency probe, runs every 500ms
         C ->> T: GET /ping, authenticated request
         T ->> C: ping response
     end
 
-    Note over C, T: reads metrics from target in separated goroutine
+    Note over C, T: target metrics are read in a separate goroutine
     loop target metrics probe, runs every 1000ms
         C ->> T: GET /metrics, authenticated request
         T ->> C: metrics response
