@@ -1,0 +1,16 @@
+name: speedtest
+services:
+  target:
+    build:
+      context: .
+      dockerfile: target/docker/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - API_KEY=${API_TOKEN:-sp33dt3st}
+  client:
+    build:
+      context: .
+      dockerfile: client/docker/Dockerfile
+    environment:
+      - API_KEY=${API_TOKEN:-sp33dt3st}

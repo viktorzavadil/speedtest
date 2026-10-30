@@ -1,0 +1,14 @@
+### Download - don't do it :)
+GET http://{{host}}/download
+X-Api-Key: {{apiKey}}
+
+### Upload
+POST http://{{host}}/upload
+X-Api-Key: {{apiKey}}
+Content-Type: text/plain
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque lacus ipsum, vulputate faucibus arcu at,
+efficitur aliquet magna. In molestie porttitor leo, vitae euismod turpis commodo a. Sed varius nunc ac lacus congue
+mattis. Sed varius sagittis odio, ac efficitur leo hendrerit quis. Praesent eu odio libero. Pellentesque vitae pretium
+risus, sed commodo elit. Etiam ornare eros vitae vestibulum sodales. Pellentesque tempus fringilla eros, quis lobortis
+elit iaculis non. Nulla vulputate purus at interdum tempus.

@@ -31,3 +31,12 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### MAC ###
+.DS_Store
