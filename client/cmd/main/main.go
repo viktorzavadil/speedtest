@@ -24,7 +24,7 @@ func main() {
 	fmt.Print("\033[34m\033[1m", banner, "\033[0m\n")
 
 	fmt.Printf("\033[1m            target:\033[0m %s\n", cfg.TargetUrl)
-	fmt.Printf("\033[1m           streams:\033[0m %d parallel streams\n", cfg.Streams)
+	fmt.Printf("\033[1m           streams:\033[0m %d\n", cfg.Streams)
 	fmt.Printf("\033[1m rx phase duration:\033[0m %s\n", cfg.DownloadPhaseDuration.String())
 	fmt.Printf("\033[1m tx phase duration:\033[0m %s\n\n", cfg.UploadPhaseDuration.String())
 

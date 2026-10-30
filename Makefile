@@ -1,4 +1,3 @@
-DURATION ?= 20
 TARGET   ?= http://target:8080
 API_KEY  ?= sp33dt3st
 STREAMS  ?= 10
