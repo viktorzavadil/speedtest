@@ -170,6 +170,19 @@ Stop all services:
 make down
 ```
 
+## Speed test validation
+
+Throughput was cross-checked against `iperf3` (4 parallel streams, 30 s, client and target on two different machines
+connected over Wi-Fi, runs executed back to back):
+
+| Direction     | speedtest  | iperf3 (receiver) |
+|---------------|------------|-------------------|
+| rx (download) | 237 Mbit/s | 212 Mbit/s        |
+| tx (upload)   | 239 Mbit/s | 232 Mbit/s        |
+
+The results differ by ~12 % (rx) and ~3 % (tx), which is within Wi-Fi variance (the iperf3 rx run had two multi-second
+throughput drops). Idle latency (avg ~20 ms, min ~6 ms) matches plain `ping` to the target (avg ~19 ms, min ~4 ms).
+
 ## Todo & Improvements
 
 1. make decision: which endpoints need auth
