@@ -115,12 +115,12 @@ sequenceDiagram
     end
 
     Note over C, T: throughput tests
-    loop download per streamer
+    loop download per stream
         C ->> T: GET /download, authenticated request
         T ->> C: response
     end
 
-    loop upload per streamer
+    loop upload per stream
         C ->> T: POST /upload, authenticated request
         T ->> C: response
     end
