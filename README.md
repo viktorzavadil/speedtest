@@ -15,18 +15,18 @@ The `client` application runs load tests and collects diagnostic data.
   |____/| .__/ \___|\___|\__,_|   |_|\___||___/\__|
         |_|
 
-              target: http://target:8080
-             streams: 10
+              target: http://192.168.1.100:8080
+             streams: 4
  idle phase duration: 5s
-   rx phase duration: 15s
-   tx phase duration: 15s
+   rx phase duration: 30s
+   tx phase duration: 30s
 
               status: finished
 
-        idle latency: min=0.480ms    avg=1.165ms    max=1.582ms
-      loaded latency: min=0.248ms    avg=2.216ms    max=9.489ms
-                  rx: 185.2GB    98.8Gbit/s
-                  tx: 128.4GB    68.5Gbit/s
+        idle latency: min=6.562ms    avg=30.194ms   max=104.414ms
+      loaded latency: min=11.931ms   avg=69.257ms   max=420.666ms
+                  rx: 721.6MB    192.4Mbit/s
+                  tx: 896.5MB    239.1Mbit/s
 ```
 
 ## Architecture
@@ -127,7 +127,7 @@ sequenceDiagram
 
 ```
 
-## Initialization & run tests
+## Setup and running the tests
 
 **Requirements:** Docker with Compose, `make`.
 
@@ -170,23 +170,23 @@ Stop all services:
 make down
 ```
 
-## Speed test validation
+## Speed Test result validation
 
-Throughput was cross-checked against `iperf3` (4 parallel streams, 30 s, client and target on two different machines
-connected over Wi-Fi, runs executed back to back):
+Throughput was cross-checked against `iperf3` (4 parallel streams, 30 s, `client` and `target` on two different machines
+connected over Wi-Fi):
 
-| Direction     | speedtest  | iperf3 (receiver) |
-|---------------|------------|-------------------|
-| rx (download) | 237 Mbit/s | 212 Mbit/s        |
-| tx (upload)   | 239 Mbit/s | 232 Mbit/s        |
+| Direction     | Speed Test | iperf3     |
+|---------------|------------|------------|
+| rx (download) | 237 Mbit/s | 212 Mbit/s |
+| tx (upload)   | 239 Mbit/s | 232 Mbit/s |
 
-The results differ by ~12 % (rx) and ~3 % (tx), which is within Wi-Fi variance (the iperf3 rx run had two multi-second
-throughput drops). Idle latency (avg ~20 ms, min ~6 ms) matches plain `ping` to the target (avg ~19 ms, min ~4 ms).
+The results differ by ~12 % (rx) and ~3 % (tx). Idle latency (avg ~20 ms, min ~6 ms) matches plain `ping` to the
+target (avg ~19 ms, min ~4 ms).
 
 ## Todo & Improvements
 
-1. make decision: which endpoints need auth
-1. implement CPU usage on client side
+1. decide which endpoints need authentication
+1. implement CPU usage on `client` side
 1. compute avg, min, max CPU usage
-1. upload & download in same time (test full duplex)
-1. upload throughput metrics should be computed in `target` service
+1. compute download throughput from the actual elapsed time of the requests
+1. compute upload throughput in the `target` service (`client` side counting includes bytes still in TCP buffers)
