@@ -190,3 +190,4 @@ target (avg ~19 ms, min ~4 ms).
 1. compute avg, min, max CPU usage
 1. compute download throughput from the actual elapsed time of the requests
 1. compute upload throughput in the `target` service (`client` side counting includes bytes still in TCP buffers)
+1. validate the `streams` parameter (set an upper limit)

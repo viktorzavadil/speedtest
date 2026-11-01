@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"flag"
 	"log"
 	"os"
@@ -44,5 +45,29 @@ func Load() (config *Config) {
 	config.LatencyProbeInterval = time.Duration(500) * time.Millisecond
 	config.TargetMetricsProbeInterval = time.Duration(1000) * time.Millisecond
 
+	err := validate(config)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	return config
+}
+
+func validate(config *Config) error {
+	if config.TargetUrl == "" {
+		return errors.New("--target is required")
+	}
+	if config.Streams < 1 {
+		return errors.New("--streams must be greater than zero")
+	}
+	if config.IdlePhaseDuration < 0 {
+		return errors.New("--idle-phase-duration must be greater than or equal to zero")
+	}
+	if config.DownloadPhaseDuration < 0 {
+		return errors.New("--download-phase-duration must be greater than or equal to zero")
+	}
+	if config.UploadPhaseDuration < 0 {
+		return errors.New("--upload-phase-duration must be greater than or equal to zero")
+	}
+	return nil
 }
